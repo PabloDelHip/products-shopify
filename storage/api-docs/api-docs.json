@@ -747,27 +747,27 @@
                                             "properties": {
                                                 "external_id": {
                                                     "type": "string",
-                                                    "example": "PROD-123"
+                                                    "example": "77"
                                                 },
                                                 "title": {
                                                     "type": "string",
-                                                    "example": "Cámara Hikvision 4K"
+                                                    "example": "Cámara IP Domo neww"
                                                 },
                                                 "vendor": {
                                                     "type": "string",
-                                                    "example": "Hikvision"
+                                                    "example": "HIKVISION"
                                                 },
                                                 "product_type": {
                                                     "type": "string",
-                                                    "example": "Cámaras"
+                                                    "example": "Cámaras IP"
                                                 },
                                                 "description_html": {
                                                     "type": "string",
-                                                    "example": "<strong>Alta definición</strong>"
+                                                    "example": "<p>Full HD con visión nocturna y PoE.</p>"
                                                 },
                                                 "status": {
                                                     "type": "string",
-                                                    "example": "active"
+                                                    "example": "ACTIVE"
                                                 },
                                                 "tags": {
                                                     "type": "array",
@@ -775,8 +775,11 @@
                                                         "type": "string"
                                                     },
                                                     "example": [
-                                                        "seguridad",
-                                                        "4k"
+                                                        "syscom",
+                                                        "hikvision",
+                                                        "camara-ip",
+                                                        "domo",
+                                                        "ds-2cd2143g0-i"
                                                     ]
                                                 },
                                                 "images": {
@@ -786,7 +789,7 @@
                                                         "format": "url"
                                                     },
                                                     "example": [
-                                                        "https://example.com/img1.jpg"
+                                                        "https://i.postimg.cc/j2W22gvK/computadora-3.jpg"
                                                     ]
                                                 },
                                                 "variants": {
@@ -799,15 +802,15 @@
                                                         "properties": {
                                                             "sku": {
                                                                 "type": "string",
-                                                                "example": "HK-12345"
+                                                                "example": "DS-2CD2143G0-I"
                                                             },
                                                             "price": {
                                                                 "type": "number",
-                                                                "example": 1250.5
+                                                                "example": 850
                                                             },
                                                             "compare_at_price": {
                                                                 "type": "number",
-                                                                "nullable": true
+                                                                "example": 1000
                                                             },
                                                             "inventory_quantity": {
                                                                 "type": "integer",
@@ -815,7 +818,7 @@
                                                             },
                                                             "inventory_management": {
                                                                 "type": "string",
-                                                                "example": "shopify"
+                                                                "example": "SHOPIFY"
                                                             },
                                                             "requires_shipping": {
                                                                 "type": "boolean",
@@ -835,11 +838,71 @@
                                                         "properties": {
                                                             "id": {
                                                                 "type": "string",
-                                                                "example": "gid://shopify/Collection/123456"
+                                                                "example": "gid://shopify/Collection/488809431263"
                                                             }
                                                         },
                                                         "type": "object"
                                                     }
+                                                },
+                                                "metafields": {
+                                                    "properties": {
+                                                        "syscom_producto_id": {
+                                                            "type": "string",
+                                                            "example": "77"
+                                                        },
+                                                        "syscom_modelo": {
+                                                            "type": "string",
+                                                            "example": "DS-2CD2143G0-I"
+                                                        },
+                                                        "syscom_sat_key": {
+                                                            "type": "string",
+                                                            "example": "43222600"
+                                                        },
+                                                        "syscom_link": {
+                                                            "type": "string",
+                                                            "example": "https://syscom/..."
+                                                        },
+                                                        "syscom_total_existencia": {
+                                                            "type": "integer",
+                                                            "example": 10
+                                                        },
+                                                        "syscom_precio_lista": {
+                                                            "type": "number",
+                                                            "example": 1000
+                                                        },
+                                                        "syscom_precio_especial": {
+                                                            "type": "number",
+                                                            "example": 850
+                                                        },
+                                                        "syscom_caracteristicas": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "type": "string"
+                                                            },
+                                                            "example": [
+                                                                "Full HD",
+                                                                "IP67",
+                                                                "PoE"
+                                                            ]
+                                                        },
+                                                        "syscom_recursos": {
+                                                            "type": "array",
+                                                            "items": {
+                                                                "properties": {
+                                                                    "recurso": {
+                                                                        "type": "string",
+                                                                        "example": "Manual"
+                                                                    },
+                                                                    "path": {
+                                                                        "type": "string",
+                                                                        "example": "/manual.pdf"
+                                                                    }
+                                                                },
+                                                                "type": "object"
+                                                            }
+                                                        }
+                                                    },
+                                                    "type": "object"
                                                 }
                                             },
                                             "type": "object"
@@ -964,6 +1027,120 @@
                                         },
                                         "data": {
                                             "type": "object"
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/shopify/variants": {
+            "get": {
+                "tags": [
+                    "Shopify Products"
+                ],
+                "summary": "Inspeccionar variantes de productos",
+                "operationId": "598743ed6adfbf35f447255b28f33a9f",
+                "responses": {
+                    "200": {
+                        "description": "Variants list",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "ok": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/shopify/publications": {
+            "get": {
+                "tags": [
+                    "Shopify Products"
+                ],
+                "summary": "Listar canales de venta (publications) de Shopify",
+                "operationId": "33765545523309cdded1ab9b30c83ad7",
+                "responses": {
+                    "200": {
+                        "description": "Publications list",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "ok": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object"
+                                            }
+                                        }
+                                    },
+                                    "type": "object"
+                                }
+                            }
+                        }
+                    }
+                },
+                "security": [
+                    {
+                        "bearerAuth": []
+                    }
+                ]
+            }
+        },
+        "/api/v1/shopify/locations": {
+            "get": {
+                "tags": [
+                    "Shopify Products"
+                ],
+                "summary": "Listar ubicaciones (inventory locations) de Shopify",
+                "operationId": "a8dfa73bbfbcfb02d94d6bddf851ebb2",
+                "responses": {
+                    "200": {
+                        "description": "Locations list",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "properties": {
+                                        "ok": {
+                                            "type": "boolean",
+                                            "example": true
+                                        },
+                                        "data": {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "object"
+                                            }
                                         }
                                     },
                                     "type": "object"

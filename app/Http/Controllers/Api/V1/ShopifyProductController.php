@@ -32,25 +32,25 @@ class ShopifyProductController extends Controller
                         items: new OA\Items(
                             required: ["external_id", "title", "status", "variants"],
                             properties: [
-                                new OA\Property(property: "external_id", type: "string", example: "PROD-123"),
-                                new OA\Property(property: "title", type: "string", example: "Cámara Hikvision 4K"),
-                                new OA\Property(property: "vendor", type: "string", example: "Hikvision"),
-                                new OA\Property(property: "product_type", type: "string", example: "Cámaras"),
-                                new OA\Property(property: "description_html", type: "string", example: "<strong>Alta definición</strong>"),
-                                new OA\Property(property: "status", type: "string", example: "active"),
-                                new OA\Property(property: "tags", type: "array", items: new OA\Items(type: "string"), example: ["seguridad", "4k"]),
-                                new OA\Property(property: "images", type: "array", items: new OA\Items(type: "string", format: "url"), example: ["https://example.com/img1.jpg"]),
+                                new OA\Property(property: "external_id", type: "string", example: "77"),
+                                new OA\Property(property: "title", type: "string", example: "Cámara IP Domo neww"),
+                                new OA\Property(property: "vendor", type: "string", example: "HIKVISION"),
+                                new OA\Property(property: "product_type", type: "string", example: "Cámaras IP"),
+                                new OA\Property(property: "description_html", type: "string", example: "<p>Full HD con visión nocturna y PoE.</p>"),
+                                new OA\Property(property: "status", type: "string", example: "ACTIVE"),
+                                new OA\Property(property: "tags", type: "array", items: new OA\Items(type: "string"), example: ["syscom", "hikvision", "camara-ip", "domo", "ds-2cd2143g0-i"]),
+                                new OA\Property(property: "images", type: "array", items: new OA\Items(type: "string", format: "url"), example: ["https://i.postimg.cc/j2W22gvK/computadora-3.jpg"]),
                                 new OA\Property(
                                     property: "variants",
                                     type: "array",
                                     items: new OA\Items(
                                         required: ["sku", "price"],
                                         properties: [
-                                            new OA\Property(property: "sku", type: "string", example: "HK-12345"),
-                                            new OA\Property(property: "price", type: "number", example: 1250.50),
-                                            new OA\Property(property: "compare_at_price", type: "number", nullable: true),
+                                            new OA\Property(property: "sku", type: "string", example: "DS-2CD2143G0-I"),
+                                            new OA\Property(property: "price", type: "number", example: 850.0),
+                                            new OA\Property(property: "compare_at_price", type: "number", example: 1000.0),
                                             new OA\Property(property: "inventory_quantity", type: "integer", example: 10),
-                                            new OA\Property(property: "inventory_management", type: "string", example: "shopify"),
+                                            new OA\Property(property: "inventory_management", type: "string", example: "SHOPIFY"),
                                             new OA\Property(property: "requires_shipping", type: "boolean", example: true),
                                             new OA\Property(property: "taxable", type: "boolean", example: true)
                                         ]
@@ -61,9 +61,33 @@ class ShopifyProductController extends Controller
                                     type: "array",
                                     items: new OA\Items(
                                         properties: [
-                                            new OA\Property(property: "id", type: "string", example: "gid://shopify/Collection/123456")
+                                            new OA\Property(property: "id", type: "string", example: "gid://shopify/Collection/488809431263")
                                         ]
                                     )
+                                ),
+                                new OA\Property(
+                                    property: "metafields",
+                                    type: "object",
+                                    properties: [
+                                        new OA\Property(property: "syscom_producto_id", type: "string", example: "77"),
+                                        new OA\Property(property: "syscom_modelo", type: "string", example: "DS-2CD2143G0-I"),
+                                        new OA\Property(property: "syscom_sat_key", type: "string", example: "43222600"),
+                                        new OA\Property(property: "syscom_link", type: "string", example: "https://syscom/..."),
+                                        new OA\Property(property: "syscom_total_existencia", type: "integer", example: 10),
+                                        new OA\Property(property: "syscom_precio_lista", type: "number", example: 1000.0),
+                                        new OA\Property(property: "syscom_precio_especial", type: "number", example: 850.0),
+                                        new OA\Property(property: "syscom_caracteristicas", type: "array", items: new OA\Items(type: "string"), example: ["Full HD", "IP67", "PoE"]),
+                                        new OA\Property(
+                                            property: "syscom_recursos",
+                                            type: "array",
+                                            items: new OA\Items(
+                                                properties: [
+                                                    new OA\Property(property: "recurso", type: "string", example: "Manual"),
+                                                    new OA\Property(property: "path", type: "string", example: "/manual.pdf")
+                                                ]
+                                            )
+                                        )
+                                    ]
                                 )
                             ]
                         )
