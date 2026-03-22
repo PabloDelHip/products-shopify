@@ -8,6 +8,7 @@ use App\Http\Requests\Category\CategoryRequest;
 use App\Http\Requests\Category\CategoryIndexRequest;
 use App\Http\Requests\Category\CategoryTreeRequest;
 use App\Http\Requests\Category\CategoryActiveRequest;
+use App\Http\Requests\Category\CategoryAncestorsRequest;
 use Illuminate\Http\Request;
 use OpenApi\Attributes as OA;
 
@@ -202,6 +203,56 @@ class CategoriesController extends Controller
         return response()->json([
             'ok' => true,
             'data' => $tree,
+        ]);
+    }
+
+    #[OA\Get(
+        path: "/api/v1/category/ancestors",
+        summary: "Obtener ancestros de una categoría",
+        tags: ["Categories"],
+        security: [["bearerAuth" => []]],
+        parameters: [
+            new OA\Parameter(name: "provider", in: "query", required: true, schema: new OA\Schema(type: "string")),
+            new OA\Parameter(name: "provider_category_id", in: "query", required: true, schema: new OA\Schema(type: "string"))
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: "Category Ancestors",
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: "ok", type: "boolean", example: true),
+                        new OA\Property(
+                            property: "data",
+                            type: "array",
+                            items: new OA\Items(
+                                properties: [
+                                    new OA\Property(property: "id", type: "integer", example: 1),
+                                    new OA\Property(property: "provider", type: "string", example: "syscom"),
+                                    new OA\Property(property: "provider_category_id", type: "string", example: "12"),
+                                    new OA\Property(property: "parent_provider_category_id", type: "string", nullable: true, example: null),
+                                    new OA\Property(property: "name", type: "string", example: "Cámaras IP"),
+                                    new OA\Property(property: "level", type: "integer", example: 1),
+                                    new OA\Property(property: "active", type: "boolean", example: true),
+                                    new OA\Property(property: "shopify_type", type: "string", example: "collection"),
+                                    new OA\Property(property: "shopify_id", type: "string", example: "gid://shopify/Collection/123")
+                                ]
+                            )
+                        )
+                    ]
+                )
+            )
+        ]
+    )]
+    public function getAncestors(CategoryAncestorsRequest $request)
+    {
+        $filters = $request->validated();
+
+        $ancestors = $this->service->ancestors($filters);
+
+        return response()->json([
+            'ok' => true,
+            'data' => $ancestors,
         ]);
     }
 

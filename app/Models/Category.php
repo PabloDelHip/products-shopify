@@ -21,6 +21,7 @@ class Category extends Model
         'name',
         'level',
         'active',
+        'created_by_batch',
     ];
 
     /**
@@ -28,6 +29,7 @@ class Category extends Model
      */
     protected $casts = [
         'active' => 'boolean',
+        'created_by_batch' => 'boolean',
         'level'  => 'integer',
     ];
 

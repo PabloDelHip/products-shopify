@@ -372,4 +372,46 @@ class ShopifyProductController extends Controller
             'data' => $data,
         ]);
     }
+
+    #[OA\Get(
+        path: "/api/v1/shopify/reports/uploads",
+        summary: "Reporte de subidas a Shopify",
+        tags: ["Shopify Products"],
+        security: [["bearerAuth" => []]],
+        parameters: [
+            new OA\Parameter(name: "from", in: "query", schema: new OA\Schema(type: "string", format: "date"), example: "2024-02-01"),
+            new OA\Parameter(name: "to", in: "query", schema: new OA\Schema(type: "string", format: "date"), example: "2024-02-28"),
+            new OA\Parameter(name: "status", in: "query", schema: new OA\Schema(type: "string", enum: ["SUCCESS", "ERROR"])),
+            new OA\Parameter(name: "summary", in: "query", description: "Retornar conteos agrupados por día", schema: new OA\Schema(type: "boolean")),
+            new OA\Parameter(name: "export", in: "query", description: "Descargar reporte en Excel (XLSX)", schema: new OA\Schema(type: "boolean")),
+            new OA\Parameter(name: "per_page", in: "query", schema: new OA\Schema(type: "integer", default: 50))
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: "Report data",
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: "ok", type: "boolean", example: true),
+                        new OA\Property(property: "data", type: "object")
+                    ]
+                )
+            )
+        ]
+    )]
+    public function getUploadReport(Request $request): mixed
+    {
+        $filters = $request->only(['from', 'to', 'status', 'summary', 'per_page', 'provider', 'export']);
+
+        if (filter_var($request->query('export'), FILTER_VALIDATE_BOOLEAN)) {
+            return $this->service->exportUploadReport($filters);
+        }
+        
+        $data = $this->service->getUploadReport($filters);
+
+        return response()->json([
+            'ok' => true,
+            'data' => $data
+        ]);
+    }
 }

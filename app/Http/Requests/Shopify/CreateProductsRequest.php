@@ -53,6 +53,11 @@ class CreateProductsRequest extends FormRequest
             'products.*.collections.*' => ['required','array'],
             'products.*.collections.*.id' => ['required','string'],
 
+            'products.*.categorias' => ['nullable','array'],
+            'products.*.categorias.*.id' => ['required','string'],
+            'products.*.categorias.*.nombre' => ['required','string'],
+            'products.*.categorias.*.nivel' => ['required','integer'],
+
             // ✅ metafields key/value
             'products.*.metafields' => ['nullable','array'],
         ];

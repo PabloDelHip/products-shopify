@@ -35,4 +35,10 @@ return [
         ],
     ],
 
+    'syscom' => [
+        'client_id' => env('SYSCOM_CLIENT_ID'),
+        'client_secret' => env('SYSCOM_CLIENT_SECRET'),
+        'base_url' => env('SYSCOM_BASE_URL', 'https://tecnosinergia.com/api/v1'), // Ajustado a la URL base común
+    ],
+
 ];

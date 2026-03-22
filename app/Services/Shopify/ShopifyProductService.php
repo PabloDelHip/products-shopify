@@ -5,6 +5,8 @@ namespace App\Services\Shopify;
 use App\Models\ShopifyProductLog;
 use App\Models\ProductUpload;
 use Illuminate\Support\Facades\DB;
+use App\Exports\ShopifyUploadExport;
+use Maatwebsite\Excel\Facades\Excel;
 use Illuminate\Support\Str;
 use App\Contracts\ShopifyLogs\ShopifyLogsRepositoryInterface;
 use App\Contracts\Shopify\ShopifyProductsRepositoryInterface;
@@ -61,6 +63,7 @@ class ShopifyProductService
             'product_name' => (string)($data['title'] ?? ''),
             'sku' => $v0['sku'] ?? null,
             'price_amount' => array_key_exists('price', (array)$v0) ? (float)$v0['price'] : null,
+            'stock' => array_key_exists('inventory_quantity', (array)$v0) ? (int)$v0['inventory_quantity'] : 0,
         ];
     }
 
@@ -548,6 +551,36 @@ class ShopifyProductService
         if ($externalId === '') {
             throw new \InvalidArgumentException('products.*.external_id is required');
         }
+
+        // 0) Procesa la estructura 'categorias' si viene en el payload
+        $extraCatInternalIds = [];
+        if (!empty($data['categorias']) && is_array($data['categorias'])) {
+            $catResult = $this->ensureCategories($provider, $data['categorias']);
+            $extraCatInternalIds = $catResult['internal_ids'];
+
+            // Mezclar colecciones de Shopify (nivel 1)
+            if (!isset($data['collections'])) {
+                $data['collections'] = [];
+            }
+            foreach ($catResult['collection_ids'] as $cid) {
+                $exists = false;
+                foreach ($data['collections'] as $existing) {
+                    if (($existing['id'] ?? '') === $cid) {
+                        $exists = true;
+                        break;
+                    }
+                }
+                if (!$exists) {
+                    $data['collections'][] = ['id' => $cid];
+                }
+            }
+
+            // Mezclar tags (nivel 2+)
+            if (!isset($data['tags'])) {
+                $data['tags'] = [];
+            }
+            $data['tags'] = array_unique(array_merge($data['tags'], $catResult['tags']));
+        }
     
         $payloadHash = hash('sha256', json_encode($data, JSON_UNESCAPED_UNICODE));
         $snapshot = $this->buildSyncSnapshot($data);
@@ -579,6 +612,8 @@ class ShopifyProductService
                 ]);
 
                 $categoryIds = $this->resolveCategoryIdsFromCollections($data['collections'] ?? []);
+                $categoryIds = array_unique(array_merge($categoryIds, $extraCatInternalIds));
+                $this->attachCategoriesToSync($provider, $externalId, $categoryIds);
     
                 // logs
                 $this->shopifyLogsRepository->create([
@@ -597,30 +632,38 @@ class ShopifyProductService
                     'shopify' => $updated,
                 ];
             } catch (\Throwable $e) {
-    
-                $this->shopifyProductsRepository->upsertByProviderExternalId($provider, $externalId, [
-                    'shopify_product_id' => $shopifyProductId,
-                    'sync_status' => 'ERROR',
-                    'payload_hash' => $payloadHash,
-                    'last_error' => $e->getMessage(),
-                    ...$snapshot,
-                ]);
+                // Si el error es específicamente que NO se encuentra el producto en Shopify...
+                if ($this->isShopifyNotFoundError($e)) {
+                    // Limpiamos el ID para que el flujo siga hacia abajo y lo CREE de nuevo en Shopify
+                    $shopifyProductId = null;
+                } else {
+                    // Si es otro tipo de error, mantenemos el comportamiento original: reportar el error y relanzar
+                    $this->shopifyProductsRepository->upsertByProviderExternalId($provider, $externalId, [
+                        'shopify_product_id' => $shopifyProductId,
+                        'sync_status' => 'ERROR',
+                        'payload_hash' => $payloadHash,
+                        'last_error' => $e->getMessage(),
+                        ...$snapshot,
+                    ]);
 
-                $categoryIds = $this->resolveCategoryIdsFromCollections($data['collections'] ?? []);
-                $this->attachCategoriesToSync($provider, $externalId, $categoryIds);
+                    $categoryIds = $this->resolveCategoryIdsFromCollections($data['collections'] ?? []);
+                    $categoryIds = array_unique(array_merge($categoryIds, $extraCatInternalIds));
+                    if (!empty($categoryIds)) {
+                        $this->attachCategoriesToSync($provider, $externalId, $categoryIds);
+                    }
 
-    
-                $this->shopifyLogsRepository->create([
-                    'provider' => $provider,
-                    'external_id' => $externalId,
-                    'shopify_product_id' => $shopifyProductId,
-                    'action' => ShopifyProductLog::ACTION_UPDATE,
-                    'status' => ShopifyProductLog::STATUS_ERROR,
-                    'payload' => $data,
-                    'error_message' => $e->getMessage(),
-                ]);
-    
-                throw $e;
+                    $this->shopifyLogsRepository->create([
+                        'provider' => $provider,
+                        'external_id' => $externalId,
+                        'shopify_product_id' => $shopifyProductId,
+                        'action' => ShopifyProductLog::ACTION_UPDATE,
+                        'status' => ShopifyProductLog::STATUS_ERROR,
+                        'payload' => $data,
+                        'error_message' => $e->getMessage(),
+                    ]);
+        
+                    throw $e;
+                }
             }
         }
     
@@ -667,6 +710,7 @@ class ShopifyProductService
             ]);
 
             $categoryIds = $this->resolveCategoryIdsFromCollections($data['collections'] ?? []);
+            $categoryIds = array_unique(array_merge($categoryIds, $extraCatInternalIds));
             $this->attachCategoriesToSync($provider, $externalId, $categoryIds);
     
             return [
@@ -825,7 +869,13 @@ class ShopifyProductService
             }
         }
     
-        // 4) Media (solo agrega, no borra)
+        // 4) Media (Limpiar existentes y subir nuevas para evitar duplicados)
+        if (isset($data['images']) && is_array($data['images'])) {
+            $existingMediaIds = $this->getProductMediaIds($productId);
+            if (!empty($existingMediaIds)) {
+                $this->step_deleteMedia($productId, $existingMediaIds);
+            }
+        }
         $media = $this->step3_createMedia($productId, $data);
         $this->step_assignCollections($productId, $data['collections'] ?? []);
 
@@ -1257,6 +1307,48 @@ class ShopifyProductService
         ];
     }
 
+    private function getProductMediaIds(string $productId): array
+    {
+        $query = <<<'GQL'
+        query GetProductMedia($id: ID!) {
+          product(id: $id) {
+            media(first: 100) {
+              nodes {
+                id
+              }
+            }
+          }
+        }
+        GQL;
+
+        $resp = $this->client->graphql($query, ['id' => $productId]);
+
+        if (!empty($resp['errors'])) {
+            return [];
+        }
+
+        return array_map(fn($node) => $node['id'], $resp['data']['product']['media']['nodes'] ?? []);
+    }
+
+    private function step_deleteMedia(string $productId, array $mediaIds): void
+    {
+        if (empty($mediaIds)) return;
+
+        $mutation = <<<'GQL'
+        mutation productDeleteMedia($productId: ID!, $mediaIds: [ID!]!) {
+          productDeleteMedia(productId: $productId, mediaIds: $mediaIds) {
+            deletedMediaIds
+            userErrors { field message }
+          }
+        }
+        GQL;
+
+        $this->client->graphql($mutation, [
+            'productId' => $productId,
+            'mediaIds' => $mediaIds,
+        ]);
+    }
+
     
 
     private function mapMetafields($metafieldsKV): array
@@ -1314,11 +1406,128 @@ class ShopifyProductService
 
         if ($categoryId) {
             $query->whereHas('categories', function ($q) use ($categoryId) {
-                $q->where('categories.id', $categoryId);
+                // Buscamos por el ID del proveedor (syscom id) que es el que se manda por la URL
+                $q->where('categories.provider_category_id', $categoryId);
             });
         }
 
         return $query->orderByDesc('id')
             ->paginate($perPage);
+    }
+
+    private function isShopifyNotFoundError(\Throwable $e): bool
+    {
+        $message = $e->getMessage();
+
+        // 1. Error de GraphQL (top level) cuando el ID no existe en el esquema o es inválido
+        // Ej: "Variable $input of type ProductInput! was provided invalid value for id (Could not find Product with id gid://shopify/Product/123)"
+        if (str_contains($message, 'Could not find Product with id')) {
+            return true;
+        }
+
+        // 2. Error de userErrors (segundo nivel) cuando el ID es sintácticamente correcto pero el objeto no está
+        // Ej: "id Product not found"
+        if (str_contains(strtolower($message), 'product not found')) {
+            return true;
+        }
+
+        return false;
+    }
+
+    private function ensureCategories(string $provider, array $categorias): array
+    {
+        $collectionIds = [];
+        $tags = [];
+        $internalIds = [];
+
+        foreach ($categorias as $cat) {
+            $catId = (string)($cat['id'] ?? '');
+            $nombre = (string)($cat['nombre'] ?? '');
+            $nivel = (int)($cat['nivel'] ?? 0);
+
+            if ($catId === '') continue;
+
+            $category = \App\Models\Category::firstOrCreate(
+                [
+                    'provider' => $provider,
+                    'provider_category_id' => $catId,
+                ],
+                [
+                    'name' => $nombre,
+                    'level' => $nivel,
+                    'active' => true,
+                    'created_by_batch' => true,
+                ]
+            );
+
+            $internalIds[] = $category->id;
+
+            if ($nivel === 1) {
+                if (empty($category->shopify_id)) {
+                    try {
+                        $shopifyCol = $this->createManualCollection(['name' => $nombre], true);
+                        $category->update([
+                            'shopify_id' => $shopifyCol['id'],
+                            'shopify_type' => 'COLLECTION',
+                        ]);
+                    } catch (\Throwable $e) {
+                        // Opcional: registrar error?
+                    }
+                }
+                if (!empty($category->shopify_id)) {
+                    $collectionIds[] = $category->shopify_id;
+                }
+            } else {
+                // Nivel 2 en adelante se guarda en la DB (ya está arriba) y se usa como tag
+                $tags[] = $nombre;
+            }
+        }
+
+        return [
+            'collection_ids' => $collectionIds,
+            'tags' => $tags,
+            'internal_ids' => $internalIds,
+        ];
+    }
+
+    public function getUploadReport(array $filters): array
+    {
+        $query = \App\Models\ShopifyProductLog::query();
+
+        if (!empty($filters['from'])) {
+            $query->whereDate('created_at', '>=', $filters['from']);
+        }
+        if (!empty($filters['to'])) {
+            $query->whereDate('created_at', '<=', $filters['to']);
+        }
+        if (!empty($filters['status'])) {
+            $query->where('status', $filters['status']);
+        }
+        if (!empty($filters['provider'])) {
+            $query->where('provider', $filters['provider']);
+        }
+
+        if (filter_var($filters['summary'] ?? false, FILTER_VALIDATE_BOOLEAN)) {
+            return $query->select(
+                DB::raw('DATE(created_at) as date'),
+                DB::raw('COUNT(*) as total'),
+                DB::raw('SUM(CASE WHEN status = "SUCCESS" THEN 1 ELSE 0 END) as success'),
+                DB::raw('SUM(CASE WHEN status = "ERROR" THEN 1 ELSE 0 END) as error')
+            )
+            ->groupBy('date')
+            ->orderByDesc('date')
+            ->get()
+            ->toArray();
+        }
+
+        return $query->orderByDesc('created_at')
+            ->paginate($filters['per_page'] ?? 50)
+            ->toArray();
+    }
+
+    public function exportUploadReport(array $filters)
+    {
+        $filename = 'shopify_uploads_' . now()->format('Y_m_d_His') . '.xlsx';
+        return Excel::download(new ShopifyUploadExport($filters), $filename);
     }
 }

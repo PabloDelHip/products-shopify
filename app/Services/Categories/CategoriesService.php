@@ -50,6 +50,7 @@ class CategoriesService
                   'active' => true,
                   'shopify_type' => 'collection',
                   'shopify_id' => $collection['id'],
+                  'created_by_batch' => $payload['created_by_batch'] ?? false,
               ]);
 
               continue;
@@ -67,6 +68,7 @@ class CategoriesService
               'active' => true,
               'shopify_type' => 'tag',
               'shopify_id' => $tag,
+              'created_by_batch' => $payload['created_by_batch'] ?? false,
           ]);
       }
 
@@ -99,6 +101,8 @@ class CategoriesService
           $query->where('active', (bool) $filters['active']);
       }
   
+      $query->where('created_by_batch', false);
+  
       return $query
           ->orderBy('level')
           ->orderBy('name')
@@ -113,6 +117,8 @@ class CategoriesService
       if (array_key_exists('active', $filters)) {
           $query->where('active', (bool) $filters['active']);
       }
+
+      $query->where('created_by_batch', false);
   
       $rows = $query
           ->orderBy('level')
@@ -153,6 +159,38 @@ class CategoriesService
       return $tree;
   }
   
+  public function ancestors(array $filters): array
+  {
+      $provider = $filters['provider'];
+      $providerCategoryId = $filters['provider_category_id'];
+
+      $category = Category::where('provider', $provider)
+          ->where('provider_category_id', $providerCategoryId)
+          ->first();
+
+      if (!$category) {
+          return [];
+      }
+
+      $path = [$category];
+      $current = $category;
+
+      while ($current->parent_provider_category_id) {
+          $parent = Category::where('provider', $provider)
+              ->where('provider_category_id', $current->parent_provider_category_id)
+              ->first();
+          
+          if (!$parent) {
+              break;
+          }
+
+          array_unshift($path, $parent);
+          $current = $parent;
+      }
+
+      return $path;
+  }
+
   public function active(int $id, bool $active) {
     $category = $this->categoryRepository->findOrFail($id);
 
