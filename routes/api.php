@@ -9,7 +9,14 @@ use App\Http\Controllers\Api\V1\SyscomController;
 Route::prefix('v1')->group(function () {
     Route::post('auth/login', [AuthController::class, 'login']);
 
-    Route::middleware('auth:api')->group(function () {
+    Route::get('/debug-token', function (\Illuminate\Http\Request $request) {
+    return response()->json([
+        'authorization_header' => $request->header('Authorization'),
+        'bearer_token' => $request->bearerToken(),
+        'expects_json' => $request->expectsJson(),
+    ]);
+});
+
       Route::get('auth/me', [AuthController::class, 'me']);
       Route::post('auth/refresh', [AuthController::class, 'refresh']);
       Route::post('auth/logout', [AuthController::class, 'logout']);
@@ -47,5 +54,4 @@ Route::prefix('v1')->group(function () {
       Route::get('shopify/collections', [ShopifyProductController::class, 'listCollections']);
 
       Route::get('shopify/reports/uploads', [ShopifyProductController::class, 'getUploadReport']);
-  });
 });

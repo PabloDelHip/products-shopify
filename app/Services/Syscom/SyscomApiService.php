@@ -99,13 +99,24 @@ class SyscomApiService
     }
 
     /**
+     * Parámetros de precio que Syscom requiere en todas las consultas de productos:
+     * moneda=mxn  → tipo de cambio del día
+     * iva=1       → precios con IVA incluido
+     * financiero=1 → aplica 4% descuento por pronto pago
+     */
+    protected array $defaultPriceParams = [
+        'moneda'      => 'mxn',
+        'financiero'  => 1,
+    ];
+
+    /**
      * Obtiene productos con filtros opcionales.
      */
     public function getProducts(array $filters = [])
     {
         try {
-            // Syscom usa parámetros como: categoria, pagina, busqueda
-            $response = $this->request()->get('/productos', $filters);
+            $params = array_merge($this->defaultPriceParams, $filters);
+            $response = $this->request()->get('/productos', $params);
             return $response->json();
         } catch (\Exception $e) {
             Log::error('Syscom GetProducts Error: ' . $e->getMessage());
@@ -119,7 +130,7 @@ class SyscomApiService
     public function getProductDetail(string $id)
     {
         try {
-            $response = $this->request()->get("/productos/{$id}");
+            $response = $this->request()->get("/productos/{$id}", $this->defaultPriceParams);
             return $response->json();
         } catch (\Exception $e) {
             Log::error("Syscom GetProductDetail Error ({$id}): " . $e->getMessage());
@@ -133,9 +144,7 @@ class SyscomApiService
     public function getProductInventory(string $id)
     {
         try {
-            // Algunos endpoints de Syscom permiten consultar solo stock/precio
-            // para ser más rápidos
-            $response = $this->request()->get("/productos/{$id}/existencia");
+            $response = $this->request()->get("/productos/{$id}/existencia", $this->defaultPriceParams);
             return $response->json();
         } catch (\Exception $e) {
             Log::error("Syscom GetProductInventory Error ({$id}): " . $e->getMessage());
