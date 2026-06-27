@@ -17,6 +17,8 @@ class ShopifyProductSync extends Model
         'product_name',
         'sku',
         'price_amount',
+        'price_percentage',
+        'price_final',
         'stock',
         'payload_hash',
         'last_synced_at',

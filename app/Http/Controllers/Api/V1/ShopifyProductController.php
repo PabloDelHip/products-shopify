@@ -38,6 +38,7 @@ class ShopifyProductController extends Controller
                                 new OA\Property(property: "product_type", type: "string", example: "Cámaras IP"),
                                 new OA\Property(property: "description_html", type: "string", example: "<p>Full HD con visión nocturna y PoE.</p>"),
                                 new OA\Property(property: "status", type: "string", example: "ACTIVE"),
+                                new OA\Property(property: "price_percentage", type: "number", example: 10, description: "Porcentaje de ganancia sobre el precio base (e.g. 10 = 10%)"),
                                 new OA\Property(property: "tags", type: "array", items: new OA\Items(type: "string"), example: ["syscom", "hikvision", "camara-ip", "domo", "ds-2cd2143g0-i"]),
                                 new OA\Property(property: "images", type: "array", items: new OA\Items(type: "string", format: "url"), example: ["https://i.postimg.cc/j2W22gvK/computadora-3.jpg"]),
                                 new OA\Property(
@@ -371,6 +372,40 @@ class ShopifyProductController extends Controller
             'ok' => true,
             'data' => $data,
         ]);
+    }
+
+    #[OA\Delete(
+        path: "/api/v1/shopify/products/{provider}/{externalId}",
+        summary: "Eliminar registro local de producto (como si nunca se subió)",
+        tags: ["Shopify Products"],
+        security: [["bearerAuth" => []]],
+        parameters: [
+            new OA\Parameter(name: "provider", in: "path", required: true, schema: new OA\Schema(type: "string"), example: "syscom"),
+            new OA\Parameter(name: "externalId", in: "path", required: true, schema: new OA\Schema(type: "string"), example: "12345")
+        ],
+        responses: [
+            new OA\Response(
+                response: 200,
+                description: "Product local records deleted",
+                content: new OA\JsonContent(
+                    properties: [
+                        new OA\Property(property: "ok", type: "boolean", example: true),
+                        new OA\Property(property: "data", type: "object")
+                    ]
+                )
+            ),
+            new OA\Response(response: 404, description: "Product sync not found")
+        ]
+    )]
+    public function deleteProduct(string $provider, string $externalId): JsonResponse
+    {
+        $result = $this->service->deleteProductLocally($provider, $externalId);
+
+        if (!$result['deleted']) {
+            return response()->json(['ok' => false, 'message' => 'Product not found'], 404);
+        }
+
+        return response()->json(['ok' => true, 'data' => $result]);
     }
 
     #[OA\Get(

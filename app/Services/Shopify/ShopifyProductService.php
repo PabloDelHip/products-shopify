@@ -59,11 +59,19 @@ class ShopifyProductService
             ? $data['variants'][0]
             : null;
 
+        $priceAmount = array_key_exists('price', (array)$v0) ? (float)$v0['price'] : null;
+        $percentage  = isset($data['price_percentage']) ? (float)$data['price_percentage'] : null;
+        $priceFinal  = ($priceAmount !== null && $percentage !== null)
+            ? round($priceAmount + $priceAmount * $percentage / 100, 2)
+            : null;
+
         return [
-            'product_name' => (string)($data['title'] ?? ''),
-            'sku' => $v0['sku'] ?? null,
-            'price_amount' => array_key_exists('price', (array)$v0) ? (float)$v0['price'] : null,
-            'stock' => array_key_exists('inventory_quantity', (array)$v0) ? (int)$v0['inventory_quantity'] : 0,
+            'product_name'     => (string)($data['title'] ?? ''),
+            'sku'              => $v0['sku'] ?? null,
+            'price_amount'     => $priceAmount,
+            'price_percentage' => $percentage,
+            'price_final'      => $priceFinal,
+            'stock'            => array_key_exists('inventory_quantity', (array)$v0) ? (int)$v0['inventory_quantity'] : 0,
         ];
     }
 
@@ -841,9 +849,16 @@ class ShopifyProductService
         $inventoryResult = null;
     
         if ($v0 && !empty($v0['sku'])) {
+            // Aplicar porcentaje al precio antes de actualizar en Shopify
+            $percentage = isset($data['price_percentage']) ? (float)$data['price_percentage'] : null;
+            if ($percentage !== null && isset($v0['price'])) {
+                $base = (float)$v0['price'];
+                $v0['price'] = round($base + $base * $percentage / 100, 2);
+            }
+
             // 3.1) Encontrar variantId real en Shopify por SKU
             $variantId = $this->findVariantIdBySku($productId, (string)$v0['sku']);
-    
+
             if ($variantId) {
                 // 3.2) Update campos de la variante (precio, compareAtPrice, taxable, etc.)
                 $variantUpdated = $this->step_updateVariant($productId, $variantId, $v0);
@@ -1207,12 +1222,19 @@ class ShopifyProductService
             }
             GQL;
     
-        $variantsInput = array_map(function ($v) use ($locationId) {
+        $percentage   = isset($data['price_percentage']) ? (float)$data['price_percentage'] : null;
+
+        $variantsInput = array_map(function ($v) use ($locationId, $percentage) {
             $invQty = isset($v['inventory_quantity']) ? (int)$v['inventory_quantity'] : null;
-    
+
+            $basePrice = isset($v['price']) ? (float)$v['price'] : null;
+            $finalPrice = ($basePrice !== null && $percentage !== null)
+                ? round($basePrice + $basePrice * $percentage / 100, 2)
+                : $basePrice;
+
             return array_filter([
                 // dinero (tu schema usa Money, Shopify acepta string/decimal)
-                'price' => isset($v['price']) ? number_format((float)$v['price'], 2, '.', '') : null,
+                'price' => $finalPrice !== null ? number_format($finalPrice, 2, '.', '') : null,
                 'compareAtPrice' => isset($v['compare_at_price'])
                     ? number_format((float)$v['compare_at_price'], 2, '.', '')
                     : null,
@@ -1487,6 +1509,39 @@ class ShopifyProductService
             'collection_ids' => $collectionIds,
             'tags' => $tags,
             'internal_ids' => $internalIds,
+        ];
+    }
+
+    public function deleteProductLocally(string $provider, string $externalId): array
+    {
+        $sync = \App\Models\ShopifyProductSync::query()
+            ->where('provider', $provider)
+            ->where('external_id', $externalId)
+            ->first();
+
+        if (!$sync) {
+            return ['deleted' => false, 'reason' => 'not_found'];
+        }
+
+        $shopifyProductId = $sync->shopify_product_id;
+
+        DB::transaction(function () use ($sync, $provider, $externalId) {
+            $sync->categories()->detach();
+            $sync->delete();
+
+            $dedupeKey = "{$provider}:{$externalId}";
+            ProductUpload::where('dedupe_key', $dedupeKey)->delete();
+
+            ShopifyProductLog::where('provider', $provider)
+                ->where('external_id', $externalId)
+                ->delete();
+        });
+
+        return [
+            'deleted' => true,
+            'provider' => $provider,
+            'external_id' => $externalId,
+            'shopify_product_id' => $shopifyProductId,
         ];
     }
 

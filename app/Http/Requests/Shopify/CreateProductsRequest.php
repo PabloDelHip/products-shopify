@@ -39,6 +39,7 @@ class CreateProductsRequest extends FormRequest
             'products.*.images.*' => ['url'],
 
             'products.*.status' => ['required', 'string'],
+            'products.*.price_percentage' => ['nullable', 'numeric', 'min:0'],
             'products.*.variants.*.inventory_management' => ['nullable', 'string'],
 
             // ✅ variant

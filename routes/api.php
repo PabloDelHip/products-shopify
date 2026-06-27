@@ -5,6 +5,7 @@ use App\Http\Controllers\Api\V1\AuthController;
 use App\Http\Controllers\Api\V1\ShopifyProductController;
 use App\Http\Controllers\Api\V1\CategoriesController;
 use App\Http\Controllers\Api\V1\SyscomController;
+use App\Http\Controllers\Api\V1\UserController;
 
 Route::prefix('v1')->group(function () {
     Route::post('auth/login', [AuthController::class, 'login']);
@@ -45,6 +46,7 @@ Route::prefix('v1')->group(function () {
         [ShopifyProductController::class, 'getStatusCounts']
     );
       Route::get('shopify/products/{provider}/{externalId}', [ShopifyProductController::class, 'findSyncWithCategories']);
+      Route::delete('shopify/products/{provider}/{externalId}', [ShopifyProductController::class, 'deleteProduct']);
     
       Route::get('shopify/variants', [ShopifyProductController::class, 'inspectProductVariantsBulkInput']);
       Route::get('shopify/locations', [ShopifyProductController::class, 'listLocations']);
@@ -54,4 +56,10 @@ Route::prefix('v1')->group(function () {
       Route::get('shopify/collections', [ShopifyProductController::class, 'listCollections']);
 
       Route::get('shopify/reports/uploads', [ShopifyProductController::class, 'getUploadReport']);
+
+      Route::get('users', [UserController::class, 'index']);
+      Route::get('users/{id}', [UserController::class, 'show']);
+      Route::post('users', [UserController::class, 'store']);
+      Route::put('users/{id}', [UserController::class, 'update']);
+      Route::delete('users/{id}', [UserController::class, 'destroy']);
 });
