@@ -789,10 +789,33 @@ class ShopifyProductService
             try {
                 $this->addProductToCollection($collectionId, $productId);
             } catch (\Throwable $e) {
-                if (!str_contains($e->getMessage(), 'Error adding')) {
+                if (str_contains($e->getMessage(), 'Error adding')) {
+                    // ya está en la colección, no pasa nada
+                } elseif (str_contains($e->getMessage(), 'does not exist')) {
+                    $newId = $this->repairMissingCollection($collectionId);
+                    $repaired = false;
+
+                    if ($newId) {
+                        try {
+                            $this->addProductToCollection($newId, $productId);
+                            $collectionId = $newId;
+                            $repaired = true;
+                        } catch (\Throwable $e2) {
+                            // no se pudo asignar ni siquiera tras recrear la colección
+                        }
+                    }
+
+                    if (!$repaired) {
+                        $items[] = [
+                            'collection_id' => $collectionId,
+                            'status' => 'skipped',
+                            'reason' => 'collection_not_found',
+                        ];
+                        continue;
+                    }
+                } else {
                     throw $e;
                 }
-                // si ya está, no pasa nada
             }
 
             $assigned++;
@@ -803,6 +826,27 @@ class ShopifyProductService
         }
 
         return ['assigned' => $assigned, 'items' => $items];
+    }
+
+    private function repairMissingCollection(string $staleShopifyId): ?string
+    {
+        $category = \App\Models\Category::where('shopify_id', $staleShopifyId)->first();
+        if (!$category) {
+            return null;
+        }
+
+        try {
+            $shopifyCol = $this->createManualCollection(['name' => $category->name], true);
+        } catch (\Throwable $e) {
+            return null;
+        }
+
+        $category->update([
+            'shopify_id' => $shopifyCol['id'],
+            'shopify_type' => 'COLLECTION',
+        ]);
+
+        return $shopifyCol['id'];
     }
 
     private function addProductToCollection(string $collectionId, string $productId): void
